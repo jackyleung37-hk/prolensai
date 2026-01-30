@@ -3,74 +3,65 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pro Cam Meter - 即時測光</title>
+    <title>Smart Cam Meter v2</title>
     <style>
-        :root { --accent: #ffdd00; }
-        body { font-family: -apple-system, sans-serif; margin: 0; background: #000; color: #fff; overflow: hidden; }
-        #camera-wrapper { position: relative; width: 100vw; height: 100vh; }
-        video { width: 100%; height: 100%; object-fit: cover; }
+        :root { --accent: #00ffcc; --bg: #0a0a0a; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; background: var(--bg); color: #fff; }
+        #camera-wrapper { position: relative; width: 100vw; height: 100vh; display: flex; flex-direction: column; }
+        video { width: 100%; height: 60%; object-fit: cover; border-bottom: 2px solid #333; }
         
-        /* 介面層 */
-        .ui-layer {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            display: flex; flex-direction: column; justify-content: space-between;
-            background: rgba(0,0,0,0.2);
+        .controls {
+            flex: 1; padding: 20px; display: flex; flex-direction: column; gap: 15px;
+            background: linear-gradient(0deg, #000 0%, #1a1a1a 100%);
         }
 
-        .header { padding: 20px; text-align: center; background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent); }
-        
-        .results-panel {
-            background: rgba(0,0,0,0.8); margin: 20px; padding: 20px; border-radius: 15px;
-            backdrop-filter: blur(10px); border: 1px solid #333;
+        .mode-selector { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 10px; }
+        .mode-btn {
+            padding: 8px 15px; border-radius: 20px; border: 1px solid #444;
+            background: #222; color: #888; white-space: nowrap; font-size: 0.8rem;
         }
+        .mode-btn.active { background: var(--accent); color: #000; border-color: var(--accent); font-weight: bold; }
 
-        .row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
-        .label { color: #888; font-size: 0.9rem; }
-        .value { color: var(--accent); font-family: monospace; font-size: 1.4rem; font-weight: bold; }
-
-        select { background: #333; color: white; border: none; padding: 5px 10px; border-radius: 5px; }
+        .display-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; text-align: center; }
+        .box { background: rgba(255,255,255,0.05); padding: 15px 5px; border-radius: 10px; border: 1px solid #333; }
+        .label { font-size: 0.7rem; color: #888; margin-bottom: 5px; }
+        .val { font-size: 1.1rem; font-family: 'Courier New', monospace; font-weight: bold; color: var(--accent); }
         
-        .ev-badge {
-            display: inline-block; padding: 2px 8px; background: var(--accent);
-            color: #000; border-radius: 4px; font-size: 0.7rem; font-weight: bold;
-        }
+        #ev-tag { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.6); padding: 5px 10px; border-radius: 5px; font-size: 0.8rem; }
     </style>
 </head>
 <body>
 
 <div id="camera-wrapper">
     <video id="video" autoplay playsinline></video>
+    <div id="ev-tag">EV <span id="ev-val">--</span></div>
     <canvas id="calcCanvas" style="display:none;"></canvas>
 
-    <div class="ui-layer">
-        <div class="header">
-            <div>CAM ASSISTANT <span class="ev-badge" id="ev-display">EV --</span></div>
+    <div class="controls">
+        <div class="mode-selector">
+            <button class="mode-btn active" onclick="setMode('auto', this)">自動平衡</button>
+            <button class="mode-btn" onclick="setMode('sports', this)">運動優先</button>
+            <button class="mode-btn" onclick="setMode('portrait', this)">人像大光圈</button>
+            <button class="mode-btn" onclick="setMode('landscape', this)">風景深</button>
         </div>
 
-        <div class="results-panel">
-            <div class="row">
-                <span class="label">設定光圈 (F-Stop)</span>
-                <select id="aperture-input" onchange="calculateSettings()">
-                    <option value="1.4">f/1.4</option>
-                    <option value="2.8" selected>f/2.8</option>
-                    <option value="4.0">f/4.0</option>
-                    <option value="8.0">f/8.0</option>
-                    <option value="11">f/11</option>
-                </select>
+        <div class="display-grid">
+            <div class="box">
+                <div class="label">光圈 (F)</div>
+                <div class="val" id="res-f">--</div>
             </div>
-
-            <hr style="border: 0.5px solid #222;">
-
-            <div class="row">
-                <span class="label">建議快門 (Shutter)</span>
-                <span class="value" id="res-shutter">1/125</span>
+            <div class="box">
+                <div class="label">快門 (S)</div>
+                <div class="val" id="res-s">--</div>
             </div>
-            <div class="row">
-                <span class="label">建議感光度 (ISO)</span>
-                <span class="value" id="res-iso">100</span>
+            <div class="box">
+                <div class="label">感光度 (ISO)</div>
+                <div class="val" id="res-iso">--</div>
             </div>
-            
-            <p style="font-size: 10px; color: #555; text-align: center;">* 基於手機鏡頭預覽亮度之估算值</p>
+        </div>
+        
+        <div style="font-size: 0.7rem; color: #444; text-align: center;">
+            請確保環境光線穩定，數據僅供專業相機設定參考
         </div>
     </div>
 </div>
@@ -79,76 +70,67 @@
     const video = document.getElementById('video');
     const canvas = document.getElementById('calcCanvas');
     const ctx = canvas.getContext('2d');
+    let currentMode = 'auto';
+    let currentEV = 10;
 
-    // 初始化相機
     async function init() {
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ 
-                video: { facingMode: "environment" }, 
-                audio: false 
-            });
-            video.srcObject = stream;
-            // 每 0.5 秒分析一次亮度
-            setInterval(analyzeBrightness, 500);
-        } catch (e) {
-            alert("請允許相機權限以使用測光功能");
-        }
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+        video.srcObject = stream;
+        setInterval(analyze, 400);
     }
 
-    function analyzeBrightness() {
+    function setMode(mode, btn) {
+        currentMode = mode;
+        document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        calculate(currentEV);
+    }
+
+    function analyze() {
         if (!video.videoWidth) return;
-
-        // 將畫面縮小畫到 canvas 減少運算量
-        canvas.width = 50;
-        canvas.height = 50;
-        ctx.drawImage(video, 0, 0, 50, 50);
-
-        const imageData = ctx.getImageData(0, 0, 50, 50);
-        let brightnessSum = 0;
-
-        for (let i = 0; i < imageData.data.length; i += 4) {
-            // 使用感知亮度公式: 0.299R + 0.587G + 0.114B
-            brightnessSum += (0.299 * imageData.data[i] + 0.587 * imageData.data[i+1] + 0.114 * imageData.data[i+2]);
-        }
-
-        const avgBrightness = brightnessSum / (50 * 50);
-        
-        // 簡單將亮度轉換為 EV 值 (這需要根據不同手機調教，這裡取一個經驗數值)
-        // 亮度 0-255 映射到 EV 2 到 EV 15
-        const ev = Math.round((avgBrightness / 255) * 13 + 2);
-        document.getElementById('ev-display').innerText = `EV ${ev}`;
-        
-        calculateSettings(ev);
+        canvas.width = 40; canvas.height = 40;
+        ctx.drawImage(video, 0, 0, 40, 40);
+        const data = ctx.getImageData(0,0,40,40).data;
+        let bright = 0;
+        for(let i=0; i<data.length; i+=4) bright += (data[i]*0.299 + data[i+1]*0.587 + data[i+2]*0.114);
+        const avg = bright / 1600;
+        currentEV = Math.max(1, Math.min(18, Math.round((avg / 255) * 14 + 2)));
+        document.getElementById('ev-val').innerText = currentEV;
+        calculate(currentEV);
     }
 
-    function calculateSettings(ev = null) {
-        if (!ev) {
-            ev = parseInt(document.getElementById('ev-display').innerText.replace('EV ', '')) || 10;
+    function calculate(ev) {
+        let f = 2.8, s = 1/125, iso = 100;
+
+        if (currentMode === 'sports') {
+            s = 1/500;
+            f = 2.8;
+            // ISO = (N^2 * 100) / (t * 2^EV)
+            iso = Math.round((f*f * 100) / (s * Math.pow(2, ev)));
+        } 
+        else if (currentMode === 'portrait') {
+            f = 1.8;
+            s = Math.max(1/1000, Math.pow(f, 2) / (Math.pow(2, ev)));
+            iso = (s < 1/1000) ? Math.round((f*f * 100) / (s * Math.pow(2, ev))) : 100;
+        }
+        else if (currentMode === 'landscape') {
+            f = 11;
+            iso = 100;
+            s = Math.pow(f, 2) / (Math.pow(2, ev));
+        }
+        else { // Auto
+            f = 4.0;
+            s = Math.pow(f, 2) / (Math.pow(2, ev));
+            if (s > 1/60) { s = 1/60; iso = Math.round((f*f * 100) / (s * Math.pow(2, ev))); }
         }
 
-        const aperture = parseFloat(document.getElementById('aperture-input').value);
+        // 格式化輸出
+        iso = Math.max(100, Math.round(iso/100)*100);
+        let sStr = s < 1 ? `1/${Math.round(1/s)}` : `${s.toFixed(1)}"`;
         
-        // 攝影公式: EV = log2(N^2 / t) + log2(ISO / 100)
-        // 簡化計算：假設我們想保持 ISO 在合理範圍
-        let suggestedISO = 100;
-        let shutterSpeed = Math.pow(aperture, 2) / (Math.pow(2, ev) * (suggestedISO / 100));
-
-        // 如果快門太慢，就提高 ISO
-        if (shutterSpeed > 1/30) {
-            shutterSpeed = 1/60; 
-            // 重新計算 ISO: ISO = (N^2 * 100) / (t * 2^EV)
-            suggestedISO = Math.round((Math.pow(aperture, 2) * 100) / (shutterSpeed * Math.pow(2, ev)));
-        }
-
-        // 格式化 ISO
-        suggestedISO = Math.ceil(suggestedISO / 100) * 100;
-        if (suggestedISO < 100) suggestedISO = 100;
-
-        // 格式化快門字串
-        let shutterStr = shutterSpeed < 1 ? `1/${Math.round(1/shutterSpeed)}s` : `${shutterSpeed.toFixed(1)}s`;
-
-        document.getElementById('res-shutter').innerText = shutterStr;
-        document.getElementById('res-iso').innerText = suggestedISO;
+        document.getElementById('res-f').innerText = `f/${f}`;
+        document.getElementById('res-s').innerText = sStr;
+        document.getElementById('res-iso').innerText = iso;
     }
 
     init();
