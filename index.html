@@ -1,244 +1,167 @@
 <!DOCTYPE html>
-<html lang="zh-HK">
+<html lang="zh-Hant">
 <head>
-<meta charset="UTF-8">
-<title>任務攻略｜StandHere 打打卡</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>攝影助手 - 專業相機測光</title>
+    <style>
+        :root { --accent: #00ffcc; --glass: rgba(0,0,0,0.7); }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; color: white; font-family: sans-serif; overflow: hidden; }
+        
+        #video { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; }
 
-<style>
-  :root {
-    --accent-color: #f5c518; 
-    --bg-body: #0a0a0a;
-    --bg-light: #161616;
-    --card-bg: #1e1e1e;
-    --border-color: rgba(255, 255, 255, 0.08);
-    --text-main: #eeeeee;
-    --text-sub: #888888;
-    --warn: #ff4d00;
-    --radius: 12px;
-  }
+        /* 對焦框動畫 */
+        .focus-bracket {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 200px; height: 200px; border: 2px solid rgba(255,255,255,0.3);
+            z-index: 10; border-radius: 20px; transition: border-color 0.3s;
+        }
+        .focus-bracket::before { content: "對準拍攝對象測光"; position: absolute; top: -30px; width: 100%; text-align: center; font-size: 12px; color: #aaa; }
 
-  * { box-sizing: border-box; }
+        /* 引導層 */
+        #guide-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 200;
+            display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 40px; text-align: center;
+        }
+        .guide-card { background: #222; padding: 25px; border-radius: 20px; border: 1px solid #444; }
+        .guide-btn { margin-top: 20px; background: var(--accent); color: black; border: none; padding: 12px 30px; border-radius: 50px; font-weight: bold; }
 
-  body {
-    margin: 0;
-    background: var(--bg-body);
-    color: var(--text-main);
-    font-family: 'Inter', -apple-system, sans-serif;
-    line-height: 1.6;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 250 250' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='5' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.03'/%3E%3C/svg%3E");
-  }
+        /* 數值面板 */
+        .ui-panel {
+            position: absolute; bottom: 0; left: 0; width: 100%; z-index: 100;
+            background: linear-gradient(to top, rgba(0,0,0,0.9) 30%, transparent);
+            padding: 30px 20px; box-sizing: border-box;
+        }
+        .instruction { text-align: center; color: var(--accent); font-size: 14px; margin-bottom: 15px; letter-spacing: 1px; }
 
-  header {
-    position: fixed; top: 0; width: 100%; z-index: 1000;
-    background: rgba(10, 10, 10, 0.8); backdrop-filter: blur(20px);
-    border-bottom: 1px solid var(--border-color);
-    padding: 14px 32px; display: flex; justify-content: space-between; align-items: center;
-  }
+        .data-row { display: flex; justify-content: space-around; margin-bottom: 25px; }
+        .box { text-align: center; flex: 1; }
+        .label { font-size: 10px; color: #888; margin-bottom: 5px; }
+        .val { font-size: 24px; font-weight: 800; font-family: 'Courier New', monospace; }
 
-  .logo { font-weight: 900; font-size: 20px; color: var(--accent-color); text-decoration: none; }
+        .shutter-btn {
+            width: 70px; height: 70px; border-radius: 50%; border: 4px solid white;
+            background: rgba(255,255,255,0.2); margin: 0 auto; display: block;
+            position: relative; transition: 0.2s;
+        }
+        .shutter-btn:active { transform: scale(0.9); }
+        .shutter-btn.locked { border-color: var(--accent); background: var(--accent); }
 
-  .spacer { height: 70px; }
-
-  /* ====== Layout ====== */
-  .layout {
-    display: grid; grid-template-columns: 1fr 400px; gap: 40px;
-    max-width: 1300px; margin: 30px auto; padding: 0 24px;
-  }
-
-  /* 左邊：任務視覺視覺區 */
-  .mission-visual { position: sticky; top: 90px; }
-  .mission-header { margin-bottom: 24px; }
-  .mission-header h1 { font-size: 32px; font-weight: 800; margin: 0; }
-  .mission-header .badge {
-    display: inline-block; background: var(--accent-color); color: #000;
-    padding: 4px 12px; border-radius: 4px; font-size: 12px; font-weight: 800;
-    margin-bottom: 8px; text-transform: uppercase;
-  }
-
-  .main-img-container {
-    position: relative; border-radius: var(--radius); overflow: hidden;
-    border: 1px solid var(--border-color); box-shadow: 0 30px 60px rgba(0,0,0,0.6);
-  }
-  .main-img-container img { width: 100%; display: block; filter: brightness(0.9); }
-  
-  /* 圖片上的「重現標記」 */
-  .replicate-overlay {
-    position: absolute; bottom: 20px; right: 20px;
-    background: rgba(0,0,0,0.6); backdrop-filter: blur(10px);
-    padding: 15px; border-radius: 8px; border: 1px solid var(--accent-color);
-    text-align: center;
-  }
-  .replicate-overlay span { display: block; font-size: 10px; color: var(--accent-color); font-weight: 700; }
-  .replicate-overlay b { font-size: 20px; color: #fff; }
-
-  /* 右邊：攻略面板 */
-  .info-column { display: flex; flex-direction: column; gap: 20px; }
-
-  .card {
-    background: var(--card-bg); border: 1px solid var(--border-color);
-    border-radius: var(--radius); padding: 24px;
-  }
-
-  .card-label { 
-    font-size: 11px; font-weight: 700; color: var(--accent-color); 
-    text-transform: uppercase; letter-spacing: 2px; margin-bottom: 15px; display: block;
-  }
-
-  /* 數據面板樣式 */
-  .data-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
-  .data-item { background: rgba(255,255,255,0.03); padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); }
-  .data-item label { display: block; font-size: 11px; color: var(--text-sub); }
-  .data-item span { font-size: 14px; font-weight: 600; color: #fff; }
-
-  /* 站位圖佔位 */
-  .positioning-map {
-    height: 180px; background: #111; border-radius: 8px; margin: 15px 0;
-    display: flex; align-items: center; justify-content: center;
-    border: 1px solid var(--border-color); position: relative;
-    overflow: hidden;
-  }
-  .position-point {
-    width: 20px; height: 20px; background: var(--accent-color); border-radius: 50%;
-    box-shadow: 0 0 15px var(--accent-color); animation: pulse 2s infinite;
-  }
-  @keyframes pulse { 0% {transform: scale(1); opacity: 1;} 100% {transform: scale(2.5); opacity: 0;} }
-
-  .instruction-box {
-    background: rgba(245, 197, 24, 0.05); border-left: 3px solid var(--accent-color);
-    padding: 15px; font-size: 14px; color: #ddd; margin: 15px 0;
-  }
-
-  .warning-box {
-    background: rgba(255, 77, 0, 0.1); border: 1px solid var(--warn);
-    padding: 12px; border-radius: 8px; color: #ff9d73; font-size: 13px;
-  }
-
-  .btn-primary {
-    display: block; width: 100%; padding: 16px; background: var(--accent-color);
-    color: #000; text-align: center; text-decoration: none; border-radius: 99px;
-    font-weight: 800; font-size: 16px; transition: 0.3s;
-    margin-top: 10px; box-shadow: 0 10px 20px rgba(245, 197, 24, 0.2);
-  }
-  .btn-primary:hover { transform: translateY(-3px); box-shadow: 0 15px 30px rgba(245, 197, 24, 0.4); }
-
-  footer { text-align: center; padding: 60px; color: #444; font-size: 12px; border-top: 1px solid var(--border-color); }
-
-  @media (max-width: 900px) {
-    .layout { grid-template-columns: 1fr; }
-    .mission-visual { position: static; }
-  }
-</style>
+        /* 快門簾 */
+        .leaf { position: fixed; left: 0; width: 100%; height: 50%; background: #000; z-index: 150; transition: 0.2s; }
+        #top-leaf { top: 0; transform: translateY(-100%); }
+        #bottom-leaf { bottom: 0; transform: translateY(100%); }
+        .leaf.active { transform: translateY(0); }
+    </style>
 </head>
-
 <body>
 
-<header>
-  <a href="#" class="logo">StandHere</a>
-  <nav>
-    <a href="#">任務地圖</a>
-    <a href="#">攻略列表</a>
-  </nav>
-</header>
-
-<div class="spacer"></div>
-
-<main class="layout">
-
-  <section class="mission-visual">
-    <div class="mission-header">
-      <span class="badge">Mission #402</span>
-      <h1>重現 Cape Sunset 的完美剪影</h1>
-    </div>
+    <video id="video" autoplay playsinline></video>
     
-    <div class="main-img-container">
-      <img src="https://images.unsplash.com/photo-1500530855697-b586d89ba3ee" alt="Mission Objective">
-      <div class="replicate-overlay">
-        <span>重現成功率</span>
-        <b>92%</b>
-      </div>
+    <div class="focus-bracket" id="bracket"></div>
+
+    <div id="guide-overlay">
+        <div class="guide-card">
+            <h3>📸 專業相機設定助手</h3>
+            <p>這是一個測光工具。請將手機對準你想拍的畫面，我們將為你的「單反/無反相機」提供最佳參數建議。</p>
+            <button class="guide-btn" onclick="closeGuide()">開始使用</button>
+        </div>
     </div>
 
-    <div style="margin-top: 30px; display: flex; align-items: center; gap: 15px;">
-      <img src="https://randomuser.me/api/portraits/men/32.jpg" style="width:40px; height:40px; border-radius:50%; border: 1px solid var(--accent-color);">
-      <div style="font-size: 14px;">
-        <span style="color:var(--text-sub)">攻略提供者：</span>
-        <strong style="color:var(--accent-color)">@travelsnapper</strong>
-      </div>
-    </div>
-  </section>
+    <div id="top-leaf" class="leaf"></div>
+    <div id="bottom-leaf" class="leaf"></div>
 
-  <section class="info-column">
+    <div class="ui-panel">
+        <div class="instruction" id="hint">STEP 1: 瞄準畫面</div>
+        
+        <div class="data-row">
+            <div class="box">
+                <div class="label">光圈建議</div>
+                <div class="val" id="res-f">f/2.8</div>
+            </div>
+            <div class="box">
+                <div class="label">快門建議</div>
+                <div class="val" id="res-s">1/125</div>
+            </div>
+            <div class="box">
+                <div class="label">ISO 建議</div>
+                <div class="val" id="res-iso">100</div>
+            </div>
+        </div>
 
-    <div class="card">
-      <span class="card-label">01 最佳時空窗口</span>
-      <div class="data-grid">
-        <div class="data-item">
-          <label>推薦月份</label>
-          <span>6月 - 8月</span>
-        </div>
-        <div class="data-item">
-          <label>日落時間</label>
-          <span>18:15</span>
-        </div>
-        <div class="data-item">
-          <label>光影持續</label>
-          <span>20 分鐘</span>
-        </div>
-        <div class="data-item">
-          <label>潮汐狀態</label>
-          <span>高漲潮</span>
-        </div>
-      </div>
+        <button class="shutter-btn" id="shutter-btn" onclick="toggleLock()"></button>
+        <p style="text-align:center; font-size:10px; color:#555; margin-top:10px;">按下圓鈕鎖定數值</p>
     </div>
 
-    <div class="card">
-      <span class="card-label">02 精確站位攻略</span>
-      <div class="positioning-map">
-        <div style="font-size: 11px; color: #333; position: absolute; top: 10px;">TOP VIEW / 俯視圖</div>
-        <div class="position-point"></div>
-        <div style="position: absolute; bottom: 10px; font-size: 10px; color: var(--text-sub);">[ 座標：33.8568° S, 151.2153° E ]</div>
-      </div>
-      <div class="instruction-box">
-        <b>關鍵站位：</b>請站在步道盡頭左側第二個長凳後方，確保相機高度與欄杆持平。
-      </div>
-      <a class="btn-primary" href="#">啟動導航前往此站位</a>
-    </div>
+    <canvas id="calcCanvas" style="display:none;"></canvas>
 
-    <div class="card">
-      <span class="card-label">03 構圖與器材清單</span>
-      <div class="data-grid" style="grid-template-columns: 1fr;">
-        <div class="data-item">
-          <label>構圖重點</label>
-          <span style="color: var(--accent-color);">對齊燈塔與太陽中心線</span>
-        </div>
-      </div>
-      <div class="data-grid" style="margin-top: 15px;">
-        <div class="data-item">
-          <label>建議焦段</label>
-          <span>105mm (Full Frame)</span>
-        </div>
-        <div class="data-item">
-          <label>相機高度</label>
-          <span>低角度 (離地 30cm)</span>
-        </div>
-      </div>
-    </div>
+<script>
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('calcCanvas');
+    const ctx = canvas.getContext('2d');
+    let isLocked = false;
+    let updateInterval;
 
-    <div class="card">
-      <span class="card-label">04 現場風險提示</span>
-      <div class="warning-box">
-        ⚠️ 注意：若雲層過厚，太陽將無法形成清晰剪影。建議提早 15 分鐘觀察雲跡線。
-      </div>
-    </div>
+    function closeGuide() {
+        document.getElementById('guide-overlay').style.display = 'none';
+        initCamera();
+    }
 
-  </section>
+    async function initCamera() {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+            video.srcObject = stream;
+            updateInterval = setInterval(analyze, 400);
+        } catch (e) { alert("請授權相機權限"); }
+    }
 
-</main>
+    function toggleLock() {
+        // 動畫
+        document.getElementById('top-leaf').classList.add('active');
+        document.getElementById('bottom-leaf').classList.add('active');
 
-<footer>
-  © 2026 StandHere 打打卡 · 任務編號 #402 · 數據由攝影社群共同維護
-</footer>
+        setTimeout(() => {
+            document.getElementById('top-leaf').classList.remove('active');
+            document.getElementById('bottom-leaf').classList.remove('active');
+            
+            isLocked = !isLocked;
+            const btn = document.getElementById('shutter-btn');
+            const hint = document.getElementById('hint');
+            const bracket = document.getElementById('bracket');
 
+            if (isLocked) {
+                btn.classList.add('locked');
+                hint.innerText = "STEP 2: 將數值輸入到你的相機";
+                bracket.style.borderColor = "var(--accent)";
+            } else {
+                btn.classList.remove('locked');
+                hint.innerText = "STEP 1: 瞄準畫面";
+                bracket.style.borderColor = "rgba(255,255,255,0.3)";
+            }
+        }, 200);
+    }
+
+    function analyze() {
+        if (!video.videoWidth || isLocked) return;
+        canvas.width = 40; canvas.height = 40;
+        ctx.drawImage(video, 0, 0, 40, 40);
+        const data = ctx.getImageData(0,0,40,40).data;
+        let bright = 0;
+        for(let i=0; i<data.length; i+=4) bright += (data[i]*0.299 + data[i+1]*0.587 + data[i+2]*0.114);
+        const avg = bright / 1600;
+        const ev = Math.max(1, Math.min(18, Math.round((avg / 255) * 14 + 2)));
+        
+        // 簡單邏輯計算
+        let f = 2.8, iso = 100;
+        let s = Math.pow(f, 2) / (Math.pow(2, ev));
+        if (s > 1/60) { s = 1/60; iso = Math.round((f*f * 100) / (s * Math.pow(2, ev))); }
+        iso = Math.max(100, Math.round(iso/100)*100);
+        let sStr = s < 1 ? `1/${Math.round(1/s)}` : `${s.toFixed(1)}s`;
+
+        document.getElementById('res-f').innerText = `f/${f}`;
+        document.getElementById('res-s').innerText = sStr;
+        document.getElementById('res-iso').innerText = iso;
+    }
+</script>
 </body>
 </html>
