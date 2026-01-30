@@ -1,32 +1,85 @@
 <!DOCTYPE html>
-<html lang="zh-HK">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>ProLens AI | 專業相機設定助手</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 攝影助手</title>
     <style>
-      body {
-        font-family: 'Inter', 'Noto Sans TC', sans-serif;
-        background-color: #0f172a; /* Slate 900 */
-        color: #f8fafc;
-      }
+        body { font-family: sans-serif; margin: 0; background: #1a1a1a; color: white; display: flex; flex-direction: column; align-items: center; }
+        #camera-container { position: relative; width: 100%; max-width: 500px; height: 70vh; overflow: hidden; }
+        video { width: 100%; height: 100%; object-fit: cover; }
+        #overlay {
+            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+            background: rgba(0,0,0,0.7); padding: 15px; border-radius: 10px;
+            width: 80%; text-align: center; border: 1px solid #444;
+        }
+        .setting-item { margin: 5px 0; font-size: 1.2rem; }
+        .label { color: #aaa; font-size: 0.8rem; text-transform: uppercase; }
+        .value { color: #00ffcc; font-weight: bold; }
+        button { margin-top: 20px; padding: 10px 20px; border-radius: 50px; border: none; background: #00ffcc; font-weight: bold; }
     </style>
-  <script type="importmap">
-{
-  "imports": {
-    "react/": "https://esm.sh/react@^19.2.4/",
-    "react": "https://esm.sh/react@^19.2.4",
-    "@google/genai": "https://esm.sh/@google/genai@^1.38.0",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.4/"
-  }
-}
-</script>
-<link rel="stylesheet" href="/index.css">
 </head>
-  <body>
-    <div id="root"></div>
-  <script type="module" src="/index.tsx"></script>
+<body>
+
+    <h2>專業相機參數建議</h2>
+
+    <div id="camera-container">
+        <video id="video" autoplay playsinline></video>
+        <div id="overlay">
+            <div class="setting-item">
+                <div class="label">建議光圈 (Aperture)</div>
+                <div class="value" id="suggest-aperture">f/2.8</div>
+            </div>
+            <div class="setting-item">
+                <div class="label">快門速度 (Shutter)</div>
+                <div class="value" id="suggest-shutter">1/125s</div>
+            </div>
+            <div class="setting-item">
+                <div class="label">感光度 (ISO)</div>
+                <div class="value" id="suggest-iso">400</div>
+            </div>
+        </div>
+    </div>
+
+    <button onclick="calculateSettings()">即時分析環境</button>
+
+    <script>
+        const video = document.getElementById('video');
+
+        // 啟動相機
+        async function startCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: "environment" }, 
+                    audio: false 
+                });
+                video.srcObject = stream;
+            } catch (err) {
+                alert("無法開啟相機，請確保已給予權限。");
+            }
+        }
+
+        // 模擬測光邏輯 (實際應用需分析 canvas 像素亮度)
+        function calculateSettings() {
+            // 這裡是一個示範邏輯：
+            // 在實際開發中，你會抓取 video 的一個 frame 到 canvas
+            // 計算平均亮度 (Luminance)，然後帶入攝影公式 EV = log2(N^2 / t)
+            
+            const scenarios = [
+                { a: "f/1.8", s: "1/200s", i: "100" }, // 明亮戶外
+                { a: "f/2.8", s: "1/60s", i: "800" },  // 室內
+                { a: "f/1.4", s: "1/30s", i: "1600" }  // 微光環境
+            ];
+            
+            // 隨機模擬一個結果 (演示用)
+            const result = scenarios[Math.floor(Math.random() * scenarios.length)];
+            
+            document.getElementById('suggest-aperture').innerText = result.a;
+            document.getElementById('suggest-shutter').innerText = result.s;
+            document.getElementById('suggest-iso').innerText = result.i;
+        }
+
+        startCamera();
+    </script>
 </body>
 </html>
