@@ -3,83 +3,94 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Pro Cam Meter - Fixed View</title>
+    <title>攝影助手 - 專業相機測光</title>
     <style>
-        :root { --accent: #00ffcc; }
-        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; overflow: hidden; font-family: sans-serif; }
+        :root { --accent: #00ffcc; --glass: rgba(0,0,0,0.7); }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; color: white; font-family: sans-serif; overflow: hidden; }
         
-        /* 1. 背景影片全螢幕 */
-        #video {
-            position: absolute; top: 0; left: 0;
-            width: 100%; height: 100%; object-fit: cover; z-index: 1;
-        }
+        #video { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; }
 
-        /* 2. 快門簾 (平時移到畫面外) */
-        .shutter {
-            position: absolute; left: 0; width: 100%; height: 50%;
-            background: #000; z-index: 100; transition: transform 0.2s ease;
+        /* 對焦框動畫 */
+        .focus-bracket {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 200px; height: 200px; border: 2px solid rgba(255,255,255,0.3);
+            z-index: 10; border-radius: 20px; transition: border-color 0.3s;
         }
-        #shutter-top { top: 0; transform: translateY(-100%); }
-        #shutter-bottom { bottom: 0; transform: translateY(100%); }
-        .shutter.active { transform: translateY(0); }
+        .focus-bracket::before { content: "對準拍攝對象測光"; position: absolute; top: -30px; width: 100%; text-align: center; font-size: 12px; color: #aaa; }
 
-        /* 3. 懸浮 UI 層 */
-        .ui-overlay {
-            position: absolute; bottom: 0; left: 0; width: 100%;
-            z-index: 50; padding-bottom: 30px;
-            background: linear-gradient(to top, rgba(0,0,0,0.8) 0%, transparent 100%);
+        /* 引導層 */
+        #guide-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 200;
+            display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 40px; text-align: center;
         }
+        .guide-card { background: #222; padding: 25px; border-radius: 20px; border: 1px solid #444; }
+        .guide-btn { margin-top: 20px; background: var(--accent); color: black; border: none; padding: 12px 30px; border-radius: 50px; font-weight: bold; }
 
-        .display-row {
-            display: flex; justify-content: space-around; padding: 20px;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+        /* 數值面板 */
+        .ui-panel {
+            position: absolute; bottom: 0; left: 0; width: 100%; z-index: 100;
+            background: linear-gradient(to top, rgba(0,0,0,0.9) 30%, transparent);
+            padding: 30px 20px; box-sizing: border-box;
         }
+        .instruction { text-align: center; color: var(--accent); font-size: 14px; margin-bottom: 15px; letter-spacing: 1px; }
 
-        .box { text-align: center; }
-        .label { font-size: 0.7rem; color: #ccc; margin-bottom: 4px; text-transform: uppercase; }
-        .val { font-size: 1.4rem; color: var(--accent); font-weight: bold; font-family: monospace; }
+        .data-row { display: flex; justify-content: space-around; margin-bottom: 25px; }
+        .box { text-align: center; flex: 1; }
+        .label { font-size: 10px; color: #888; margin-bottom: 5px; }
+        .val { font-size: 24px; font-weight: 800; font-family: 'Courier New', monospace; }
 
-        .btn-container { text-align: center; margin-top: 10px; }
-        #shutter-trigger {
-            width: 65px; height: 65px; border-radius: 50%; border: 4px solid #fff;
-            background: rgba(255,255,255,0.3); box-shadow: 0 0 15px rgba(0,0,0,0.5);
+        .shutter-btn {
+            width: 70px; height: 70px; border-radius: 50%; border: 4px solid white;
+            background: rgba(255,255,255,0.2); margin: 0 auto; display: block;
+            position: relative; transition: 0.2s;
         }
-        #shutter-trigger.locked { border-color: var(--accent); background: rgba(0, 255, 204, 0.3); }
+        .shutter-btn:active { transform: scale(0.9); }
+        .shutter-btn.locked { border-color: var(--accent); background: var(--accent); }
 
-        #ev-tag {
-            position: absolute; top: 20px; left: 20px; z-index: 50;
-            background: rgba(0,0,0,0.5); padding: 4px 10px; border-radius: 4px; font-size: 0.8rem; color: #eee;
-        }
+        /* 快門簾 */
+        .leaf { position: fixed; left: 0; width: 100%; height: 50%; background: #000; z-index: 150; transition: 0.2s; }
+        #top-leaf { top: 0; transform: translateY(-100%); }
+        #bottom-leaf { bottom: 0; transform: translateY(100%); }
+        .leaf.active { transform: translateY(0); }
     </style>
 </head>
 <body>
 
     <video id="video" autoplay playsinline></video>
     
-    <div id="shutter-top" class="shutter"></div>
-    <div id="shutter-bottom" class="shutter"></div>
+    <div class="focus-bracket" id="bracket"></div>
 
-    <div id="ev-tag">ENV: <span id="ev-val">--</span> EV</div>
+    <div id="guide-overlay">
+        <div class="guide-card">
+            <h3>📸 專業相機設定助手</h3>
+            <p>這是一個測光工具。請將手機對準你想拍的畫面，我們將為你的「單反/無反相機」提供最佳參數建議。</p>
+            <button class="guide-btn" onclick="closeGuide()">開始使用</button>
+        </div>
+    </div>
 
-    <div class="ui-overlay">
-        <div class="display-row">
+    <div id="top-leaf" class="leaf"></div>
+    <div id="bottom-leaf" class="leaf"></div>
+
+    <div class="ui-panel">
+        <div class="instruction" id="hint">STEP 1: 瞄準畫面</div>
+        
+        <div class="data-row">
             <div class="box">
-                <div class="label">Aperture</div>
-                <div class="val" id="res-f">--</div>
+                <div class="label">光圈建議</div>
+                <div class="val" id="res-f">f/2.8</div>
             </div>
             <div class="box">
-                <div class="label">Shutter</div>
-                <div class="val" id="res-s">--</div>
+                <div class="label">快門建議</div>
+                <div class="val" id="res-s">1/125</div>
             </div>
             <div class="box">
-                <div class="label">ISO</div>
-                <div class="val" id="res-iso">--</div>
+                <div class="label">ISO 建議</div>
+                <div class="val" id="res-iso">100</div>
             </div>
         </div>
 
-        <div class="btn-container">
-            <button id="shutter-trigger" onclick="triggerShutter()"></button>
-        </div>
+        <button class="shutter-btn" id="shutter-btn" onclick="toggleLock()"></button>
+        <p style="text-align:center; font-size:10px; color:#555; margin-top:10px;">按下圓鈕鎖定數值</p>
     </div>
 
     <canvas id="calcCanvas" style="display:none;"></canvas>
@@ -88,45 +99,46 @@
     const video = document.getElementById('video');
     const canvas = document.getElementById('calcCanvas');
     const ctx = canvas.getContext('2d');
-    const sTop = document.getElementById('shutter-top');
-    const sBottom = document.getElementById('shutter-bottom');
-    const btn = document.getElementById('shutter-trigger');
-
     let isLocked = false;
     let updateInterval;
 
-    async function init() {
+    function closeGuide() {
+        document.getElementById('guide-overlay').style.display = 'none';
+        initCamera();
+    }
+
+    async function initCamera() {
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ 
-                video: { facingMode: "environment" },
-                audio: false 
-            });
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
             video.srcObject = stream;
-            startMetering();
-        } catch (e) { alert("請檢查相機權限"); }
+            updateInterval = setInterval(analyze, 400);
+        } catch (e) { alert("請授權相機權限"); }
     }
 
-    function startMetering() {
-        updateInterval = setInterval(analyze, 500);
-    }
-
-    function triggerShutter() {
-        sTop.classList.add('active');
-        sBottom.classList.add('active');
+    function toggleLock() {
+        // 動畫
+        document.getElementById('top-leaf').classList.add('active');
+        document.getElementById('bottom-leaf').classList.add('active');
 
         setTimeout(() => {
-            sTop.classList.remove('active');
-            sBottom.classList.remove('active');
+            document.getElementById('top-leaf').classList.remove('active');
+            document.getElementById('bottom-leaf').classList.remove('active');
             
             isLocked = !isLocked;
+            const btn = document.getElementById('shutter-btn');
+            const hint = document.getElementById('hint');
+            const bracket = document.getElementById('bracket');
+
             if (isLocked) {
-                clearInterval(updateInterval);
                 btn.classList.add('locked');
+                hint.innerText = "STEP 2: 將數值輸入到你的相機";
+                bracket.style.borderColor = "var(--accent)";
             } else {
-                startMetering();
                 btn.classList.remove('locked');
+                hint.innerText = "STEP 1: 瞄準畫面";
+                bracket.style.borderColor = "rgba(255,255,255,0.3)";
             }
-        }, 250);
+        }, 200);
     }
 
     function analyze() {
@@ -137,31 +149,19 @@
         let bright = 0;
         for(let i=0; i<data.length; i+=4) bright += (data[i]*0.299 + data[i+1]*0.587 + data[i+2]*0.114);
         const avg = bright / 1600;
+        const ev = Math.max(1, Math.min(18, Math.round((avg / 255) * 14 + 2)));
         
-        // 修正測光敏感度
-        const ev = Math.max(1, Math.min(17, Math.round((avg / 255) * 12 + 3)));
-        document.getElementById('ev-val').innerText = ev;
-        calculate(ev);
-    }
-
-    function calculate(ev) {
+        // 簡單邏輯計算
         let f = 2.8, iso = 100;
         let s = Math.pow(f, 2) / (Math.pow(2, ev));
-
-        if (s > 1/60) {
-            s = 1/60;
-            iso = Math.round((f*f * 100) / (s * Math.pow(2, ev)));
-        }
-
+        if (s > 1/60) { s = 1/60; iso = Math.round((f*f * 100) / (s * Math.pow(2, ev))); }
         iso = Math.max(100, Math.round(iso/100)*100);
         let sStr = s < 1 ? `1/${Math.round(1/s)}` : `${s.toFixed(1)}s`;
-        
+
         document.getElementById('res-f').innerText = `f/${f}`;
         document.getElementById('res-s').innerText = sStr;
         document.getElementById('res-iso').innerText = iso;
     }
-
-    init();
 </script>
 </body>
 </html>
