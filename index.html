@@ -2,83 +2,87 @@
 <html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pro Cam Meter - Shutter Edition</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pro Cam Meter - Fixed View</title>
     <style>
-        :root { --accent: #00ffcc; --bg: #0a0a0a; }
-        body { font-family: -apple-system, sans-serif; margin: 0; background: var(--bg); color: #fff; overflow: hidden; }
+        :root { --accent: #00ffcc; }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; overflow: hidden; font-family: sans-serif; }
         
-        /* 畫面容器 */
-        #camera-wrapper { position: relative; width: 100vw; height: 100vh; }
-        video { width: 100%; height: 60%; object-fit: cover; }
+        /* 1. 背景影片全螢幕 */
+        #video {
+            position: absolute; top: 0; left: 0;
+            width: 100%; height: 100%; object-fit: cover; z-index: 1;
+        }
 
-        /* 快門簾動畫 */
+        /* 2. 快門簾 (平時移到畫面外) */
         .shutter {
-            position: absolute; left: 0; width: 100%; height: 30%;
-            background: #000; z-index: 100; transition: transform 0.15s ease-in-out;
+            position: absolute; left: 0; width: 100%; height: 50%;
+            background: #000; z-index: 100; transition: transform 0.2s ease;
         }
         #shutter-top { top: 0; transform: translateY(-100%); }
-        #shutter-bottom { bottom: 40%; transform: translateY(100%); }
-        /* 啟動快門時的狀態 */
-        .shutter.active { transform: translateY(0) !important; }
+        #shutter-bottom { bottom: 0; transform: translateY(100%); }
+        .shutter.active { transform: translateY(0); }
 
-        /* 控制介面 */
-        .controls {
-            position: absolute; bottom: 0; width: 100%; height: 40%;
-            background: #111; padding: 15px; box-sizing: border-box;
-            display: flex; flex-direction: column; justify-content: space-around;
+        /* 3. 懸浮 UI 層 */
+        .ui-overlay {
+            position: absolute; bottom: 0; left: 0; width: 100%;
+            z-index: 50; padding-bottom: 30px;
+            background: linear-gradient(to top, rgba(0,0,0,0.8) 0%, transparent 100%);
         }
 
-        .display-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
-        .box { background: #222; padding: 10px; border-radius: 8px; text-align: center; border: 1px solid #333; }
-        .label { font-size: 0.7rem; color: #888; }
-        .val { font-size: 1.2rem; color: var(--accent); font-weight: bold; margin-top: 5px; }
+        .display-row {
+            display: flex; justify-content: space-around; padding: 20px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+        }
 
-        /* 快門按鈕 */
-        .shutter-btn-container { text-align: center; margin-top: 10px; }
+        .box { text-align: center; }
+        .label { font-size: 0.7rem; color: #ccc; margin-bottom: 4px; text-transform: uppercase; }
+        .val { font-size: 1.4rem; color: var(--accent); font-weight: bold; font-family: monospace; }
+
+        .btn-container { text-align: center; margin-top: 10px; }
         #shutter-trigger {
-            width: 70px; height: 70px; border-radius: 50%; border: 5px solid #fff;
-            background: radial-gradient(circle, #fff 40%, transparent 50%);
-            cursor: pointer; transition: transform 0.1s;
+            width: 65px; height: 65px; border-radius: 50%; border: 4px solid #fff;
+            background: rgba(255,255,255,0.3); box-shadow: 0 0 15px rgba(0,0,0,0.5);
         }
-        #shutter-trigger:active { transform: scale(0.9); }
-        #shutter-trigger.locked { background: radial-gradient(circle, var(--accent) 40%, transparent 50%); border-color: var(--accent); }
+        #shutter-trigger.locked { border-color: var(--accent); background: rgba(0, 255, 204, 0.3); }
 
-        #ev-tag { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.6); padding: 5px 10px; border-radius: 5px; font-size: 0.8rem; z-index: 50; }
+        #ev-tag {
+            position: absolute; top: 20px; left: 20px; z-index: 50;
+            background: rgba(0,0,0,0.5); padding: 4px 10px; border-radius: 4px; font-size: 0.8rem; color: #eee;
+        }
     </style>
 </head>
 <body>
 
-<div id="camera-wrapper">
-    <div id="shutter-top" class="shutter"></div>
     <video id="video" autoplay playsinline></video>
-    <div id="shutter-bottom" class="shutter"></div>
     
-    <div id="ev-tag">EV <span id="ev-val">--</span></div>
-    <canvas id="calcCanvas" style="display:none;"></canvas>
+    <div id="shutter-top" class="shutter"></div>
+    <div id="shutter-bottom" class="shutter"></div>
 
-    <div class="controls">
-        <div class="display-grid">
+    <div id="ev-tag">ENV: <span id="ev-val">--</span> EV</div>
+
+    <div class="ui-overlay">
+        <div class="display-row">
             <div class="box">
-                <div class="label">光圈 (F)</div>
+                <div class="label">Aperture</div>
                 <div class="val" id="res-f">--</div>
             </div>
             <div class="box">
-                <div class="label">快門 (S)</div>
+                <div class="label">Shutter</div>
                 <div class="val" id="res-s">--</div>
             </div>
             <div class="box">
-                <div class="label">感光度 (ISO)</div>
+                <div class="label">ISO</div>
                 <div class="val" id="res-iso">--</div>
             </div>
         </div>
 
-        <div class="shutter-btn-container">
+        <div class="btn-container">
             <button id="shutter-trigger" onclick="triggerShutter()"></button>
-            <p style="font-size: 0.7rem; color: #666; margin-top: 5px;" id="status-text">點擊快門鎖定數值</p>
         </div>
     </div>
-</div>
+
+    <canvas id="calcCanvas" style="display:none;"></canvas>
 
 <script>
     const video = document.getElementById('video');
@@ -87,26 +91,26 @@
     const sTop = document.getElementById('shutter-top');
     const sBottom = document.getElementById('shutter-bottom');
     const btn = document.getElementById('shutter-trigger');
-    const statusText = document.getElementById('status-text');
 
     let isLocked = false;
-    let currentEV = 10;
     let updateInterval;
 
     async function init() {
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+                video: { facingMode: "environment" },
+                audio: false 
+            });
             video.srcObject = stream;
             startMetering();
-        } catch (e) { alert("無法開啟相機"); }
+        } catch (e) { alert("請檢查相機權限"); }
     }
 
     function startMetering() {
-        updateInterval = setInterval(analyze, 400);
+        updateInterval = setInterval(analyze, 500);
     }
 
     function triggerShutter() {
-        // 播放快門動畫
         sTop.classList.add('active');
         sBottom.classList.add('active');
 
@@ -114,18 +118,15 @@
             sTop.classList.remove('active');
             sBottom.classList.remove('active');
             
-            // 切換鎖定狀態
             isLocked = !isLocked;
             if (isLocked) {
                 clearInterval(updateInterval);
                 btn.classList.add('locked');
-                statusText.innerText = "已鎖定數值 (點擊解鎖)";
             } else {
                 startMetering();
                 btn.classList.remove('locked');
-                statusText.innerText = "點擊快門鎖定數值";
             }
-        }, 200); // 動態時間與 CSS transition 對應
+        }, 250);
     }
 
     function analyze() {
@@ -136,24 +137,24 @@
         let bright = 0;
         for(let i=0; i<data.length; i+=4) bright += (data[i]*0.299 + data[i+1]*0.587 + data[i+2]*0.114);
         const avg = bright / 1600;
-        currentEV = Math.max(1, Math.min(18, Math.round((avg / 255) * 14 + 2)));
-        document.getElementById('ev-val').innerText = currentEV;
-        calculate(currentEV);
+        
+        // 修正測光敏感度
+        const ev = Math.max(1, Math.min(17, Math.round((avg / 255) * 12 + 3)));
+        document.getElementById('ev-val').innerText = ev;
+        calculate(ev);
     }
 
     function calculate(ev) {
-        // 使用一個基準預設值：f/2.8
         let f = 2.8, iso = 100;
         let s = Math.pow(f, 2) / (Math.pow(2, ev));
 
-        // 如果快門太慢，拉高 ISO
         if (s > 1/60) {
             s = 1/60;
             iso = Math.round((f*f * 100) / (s * Math.pow(2, ev)));
         }
 
         iso = Math.max(100, Math.round(iso/100)*100);
-        let sStr = s < 1 ? `1/${Math.round(1/s)}` : `${s.toFixed(1)}"`;
+        let sStr = s < 1 ? `1/${Math.round(1/s)}` : `${s.toFixed(1)}s`;
         
         document.getElementById('res-f').innerText = `f/${f}`;
         document.getElementById('res-s').innerText = sStr;
