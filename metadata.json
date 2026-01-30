@@ -1,0 +1,7 @@
+{
+  "name": "ProLens AI - 專業攝影助手",
+  "description": "Snap a photo of your environment and get instant professional camera setting suggestions (ISO, Aperture, Shutter Speed) powered by AI.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
